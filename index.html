@@ -28,8 +28,16 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            cursor: none;
+            -webkit-tap-highlight-color: transparent;
         }
+
+
+        @media (hover: hover) {
+            * {
+                cursor: none;
+            }
+        }
+
 
         body {
             background-color: var(--bg);
@@ -310,13 +318,28 @@
             display: grid;
             grid-template-columns: 200px 1fr 100px;
             gap: 2rem;
-            transition: var(--transition);
+            transition: background-color 0.3s ease, border-left 0.3s ease;
+            border-left: 0 solid var(--accent);
+            backface-visibility: hidden;
+            transform: translateZ(0);
         }
 
-        .log-entry:hover {
-            background: rgba(74, 255, 212, 0.02);
-            padding-left: 1rem;
+
+        @media (hover: hover) and (pointer: fine) {
+            .log-entry:hover {
+                background: rgba(74, 255, 212, 0.02);
+                padding-left: 1rem;
+                border-left: 2px solid var(--accent);
+            }
         }
+
+
+        /* Prevent double-tap zoom/flash on log entries */
+        .log-entry {
+            touch-action: manipulation;
+        }
+
+
 
         .log-date {
             font-size: 0.8rem;
@@ -354,6 +377,15 @@
             text-align: right;
         }
 
+        @media (max-width: 768px) {
+            .log-status {
+                text-align: left;
+                margin-top: 0.5rem;
+                opacity: 0.8;
+            }
+        }
+
+
         /* --- Memory Grid (V3 - Responsive Fix) --- */
         .memory-grid {
             display: grid;
@@ -367,17 +399,44 @@
             border-right: 1px solid var(--border);
             border-bottom: 1px solid var(--border);
             position: relative;
-            transition: var(--transition);
+            transition: background-color 0.3s ease, color 0.3s ease;
             overflow: hidden;
             display: flex;
             align-items: center;
             justify-content: center;
+            touch-action: manipulation;
+            user-select: none;
         }
 
-        .memory-cell:hover {
+        /* Hover & Tap State */
+        .memory-cell:hover,
+        .memory-cell:active {
             background: var(--accent);
             color: var(--bg);
         }
+
+        .memory-cell:hover .cell-label,
+        .memory-cell:active .cell-label {
+            color: rgba(0, 0, 0, 0.5);
+        }
+
+        .memory-cell:hover .cell-name,
+        .memory-cell:active .cell-name {
+            opacity: 0;
+            transform: scale(0.9);
+        }
+
+        .memory-cell:hover .cell-info,
+        .memory-cell:active .cell-info {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .memory-cell:hover .cell-meta,
+        .memory-cell:active .cell-meta {
+            opacity: 0.8;
+        }
+
 
         .cell-label {
             font-size: 0.65rem;
@@ -385,10 +444,7 @@
             position: absolute;
             top: 1rem;
             left: 1rem;
-        }
-
-        .memory-cell:hover .cell-label {
-            color: rgba(0, 0, 0, 0.5);
+            transition: color 0.3s ease;
         }
 
         .cell-name {
@@ -398,12 +454,7 @@
             font-weight: 800;
             text-align: center;
             line-height: 1.1;
-            transition: var(--transition);
-        }
-
-        .memory-cell:hover .cell-name {
-            opacity: 0;
-            transform: scale(0.9);
+            transition: transform 0.3s ease, opacity 0.3s ease;
         }
 
         .cell-info {
@@ -414,14 +465,9 @@
             color: var(--bg);
             opacity: 0;
             transform: translateY(10px);
-            transition: var(--transition);
+            transition: transform 0.3s ease, opacity 0.3s ease;
             pointer-events: none;
             font-weight: 500;
-        }
-
-        .memory-cell:hover .cell-info {
-            opacity: 1;
-            transform: translateY(0);
         }
 
         .cell-meta {
@@ -430,12 +476,10 @@
             right: 1rem;
             font-size: 9px;
             opacity: 0;
-            transition: var(--transition);
+            transition: opacity 0.3s ease;
         }
 
-        .memory-cell:hover .cell-meta {
-            opacity: 0.8;
-        }
+
 
         /* --- Impact Stats --- */
         .impact {
@@ -719,9 +763,22 @@
         // --- High Precision Cursor ---
         const cursor = document.getElementById('cursor');
         const status = document.getElementById('cursor-status');
+
+        // Check if device is touch-primary
+        const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0 || window.matchMedia('(pointer: coarse)').matches;
+        if (isTouchDevice) {
+            cursor.style.display = 'none';
+            status.style.display = 'none';
+            document.body.style.cursor = 'auto';
+        }
+
+
         document.addEventListener('mousemove', (e) => {
+            if (isTouchDevice) return;
+
             cursor.style.left = e.clientX + 'px'; cursor.style.top = e.clientY + 'px';
             status.style.left = e.clientX + 'px'; status.style.top = e.clientY + 'px';
+
 
             const isSkill = e.target.closest('.memory-cell');
             const isLink = e.target.closest('a, .log-entry');
@@ -820,9 +877,15 @@
         type();
 
         // --- Decryption Effect ---
+        let lastTouch = 0;
+        window.addEventListener('touchstart', () => lastTouch = Date.now(), { passive: true });
+
         document.querySelectorAll('[data-decrypt]').forEach(el => {
             const original = el.innerText;
             el.addEventListener('mouseenter', () => {
+                // Persistent guard: direct device check + recent touch check
+                if (isTouchDevice || Date.now() - lastTouch < 1000) return;
+
                 let iterations = 0;
                 const interval = setInterval(() => {
                     el.innerText = original.split('').map((char, index) => {
@@ -834,6 +897,8 @@
                 }, 30);
             });
         });
+
+
 
         // --- Observer ---
         const observer = new IntersectionObserver((entries) => {
