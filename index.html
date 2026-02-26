@@ -1014,6 +1014,7 @@
         const splineCanvas = document.getElementById('spline-canvas');
         const splineLoader = document.getElementById('spline-loader');
         const splineBg = document.getElementById('spline-bg');
+        let splineReady = false;
 
         // Skip on mobile / touch devices for performance
         const isMobile = window.innerWidth < 768 || ('ontouchstart' in window && window.matchMedia('(pointer: coarse)').matches);
@@ -1024,15 +1025,16 @@
             app.load('https://prod.spline.design/7PEbpAR15WkVYR3m/scene.splinecode')
                 .then(() => {
                     console.log('✅ SPLINE_3D::SUBSYSTEM_ONLINE');
-
-                    // Fade in the 3D scene
-                    splineCanvas.classList.add('loaded');
+                    splineReady = true;
 
                     // Hide the loader
                     if (splineLoader) splineLoader.classList.add('hidden');
 
                     // Enable pointer events so the scene is interactive on desktop
                     splineBg.style.pointerEvents = 'auto';
+
+                    // Apply initial opacity based on current scroll position
+                    updateSplineOpacity();
                 })
                 .catch((err) => {
                     console.warn('⚠️ SPLINE_3D::LOAD_FAILED', err);
@@ -1041,6 +1043,23 @@
                         if (splineLoader) splineLoader.classList.add('hidden');
                     }, 3000);
                 });
+
+            // Scroll-driven reveal: 3D scene fades in as user scrolls past hero
+            function updateSplineOpacity() {
+                if (!splineReady) return;
+                const heroHeight = window.innerHeight;
+                const scrollY = window.scrollY;
+                // Start fading in after 30% of hero, fully visible by 100% of hero
+                const fadeStart = heroHeight * 0.3;
+                const fadeEnd = heroHeight;
+                let progress = 0;
+                if (scrollY > fadeStart) {
+                    progress = Math.min((scrollY - fadeStart) / (fadeEnd - fadeStart), 1);
+                }
+                splineCanvas.style.opacity = progress * 0.22;
+            }
+
+            window.addEventListener('scroll', updateSplineOpacity, { passive: true });
         } else {
             // Mobile: hide loader immediately
             if (splineLoader) splineLoader.classList.add('hidden');
