@@ -17,7 +17,7 @@
             --accent: #4AFFD4;
             --secondary: #1F3A8C;
             --text-primary: #E8E8F0;
-            --text-muted: #555570;
+            --text-muted: #8888A0;
             --border: #1E1E30;
             --font-display: 'Syne', sans-serif;
             --font-body: 'IBM Plex Mono', monospace;
@@ -130,6 +130,73 @@
             opacity: 0.1;
         }
 
+        /* --- Spline 3D Background --- */
+        #spline-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -2;
+            pointer-events: none;
+        }
+
+        #spline-bg canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        #spline-bg .spline-canvas-inner {
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            transition: opacity 2s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        #spline-bg .spline-canvas-inner.loaded {
+            opacity: 0.18;
+        }
+
+        /* Subtle uniform tint — keeps the 3D scene blended without visible gradients */
+        #spline-bg::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(10, 10, 15, 0.3);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* Spline loading indicator */
+        #spline-loader {
+            position: fixed;
+            bottom: 1.5rem;
+            left: 1.5rem;
+            font-size: 9px;
+            font-family: var(--font-body);
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            z-index: 5;
+            opacity: 0.6;
+            transition: opacity 0.5s ease;
+        }
+
+        #spline-loader.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        @media (max-width: 768px) {
+            #spline-bg {
+                display: none;
+            }
+
+            #spline-loader {
+                display: none;
+            }
+        }
+
         /* --- Layout --- */
         .container {
             max-width: 1200px;
@@ -168,12 +235,13 @@
             text-transform: uppercase;
             letter-spacing: -4px;
             position: relative;
+            text-shadow: 0 0 40px rgba(10, 10, 15, 0.9), 0 0 80px rgba(10, 10, 15, 0.6);
         }
 
         .hero h1 .surname {
             display: block;
             font-size: clamp(2rem, 9vw, 6rem);
-            color: var(--text-muted);
+            color: #9999B0;
             font-weight: 400;
             letter-spacing: -2px;
         }
@@ -185,14 +253,18 @@
             letter-spacing: 4px;
             text-transform: uppercase;
             min-height: 1.5rem;
+            text-shadow: 0 0 20px rgba(74, 255, 212, 0.4);
+            position: relative;
+            z-index: 2;
         }
 
         .hero-decor {
             position: absolute;
             font-size: 10px;
-            color: var(--text-muted);
+            color: #9999B0;
             text-transform: uppercase;
             letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(10, 10, 15, 0.8);
         }
 
         .hero-decor.top-left {
@@ -216,11 +288,13 @@
         }
 
         .biometric-module {
-            background: var(--surface);
+            background: rgba(16, 16, 26, 0.9);
             border: 1px solid var(--border);
             padding: 2rem;
             position: relative;
             overflow: hidden;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
         }
 
         .scan-frame {
@@ -302,9 +376,10 @@
 
         .about-content p {
             font-size: 1.1rem;
-            color: var(--text-muted);
+            color: #9999B0;
             max-width: 600px;
             margin-bottom: 1.5rem;
+            text-shadow: 0 0 10px rgba(10, 10, 15, 0.8);
         }
 
         /* --- Experience Archive --- */
@@ -322,6 +397,9 @@
             border-left: 0 solid var(--accent);
             backface-visibility: hidden;
             transform: translateZ(0);
+            background: rgba(10, 10, 15, 0.5);
+            padding-left: 1rem;
+            padding-right: 1rem;
         }
 
 
@@ -362,8 +440,9 @@
 
         .log-details {
             font-size: 0.9rem;
-            color: var(--text-muted);
+            color: #9999B0;
             list-style: none;
+            text-shadow: 0 0 8px rgba(10, 10, 15, 0.8);
         }
 
         .log-details li::before {
@@ -406,6 +485,9 @@
             justify-content: center;
             touch-action: manipulation;
             user-select: none;
+            background: rgba(10, 10, 15, 0.6);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
         }
 
         /* Hover & Tap State */
@@ -483,10 +565,12 @@
 
         /* --- Impact Stats --- */
         .impact {
-            background: var(--surface);
+            background: rgba(16, 16, 26, 0.85);
             padding: 8rem 0;
             border-top: 1px solid var(--border);
             border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
         }
 
         .stat-group {
@@ -592,6 +676,12 @@
     <div id="cursor"></div>
     <div id="cursor-status">System::Ready</div>
     <canvas id="bg-canvas"></canvas>
+
+    <!-- Spline 3D Background Layer -->
+    <div id="spline-bg">
+        <canvas id="spline-canvas" class="spline-canvas-inner"></canvas>
+    </div>
+    <div id="spline-loader">[ LOADING 3D SUBSYSTEM... ]</div>
 
     <section class="hero reveal">
         <div class="hero-decor top-left">
@@ -906,12 +996,54 @@
         }, { threshold: 0.1 });
         document.querySelectorAll('section').forEach(s => observer.observe(s));
 
+
+
         function startStats() {
             document.querySelectorAll('.stat').forEach(stat => {
                 const target = +stat.getAttribute('data-target');
                 let now = 0;
                 const int = setInterval(() => { now += target / 100; stat.innerText = Math.floor(now).toString().padStart(2, '0'); if (now >= target) { stat.innerText = target; clearInterval(int); } }, 20);
             });
+        }
+    </script>
+
+    <!-- Spline 3D Runtime (separate module script) -->
+    <script type="module">
+        import { Application } from 'https://esm.sh/@splinetool/runtime';
+
+        const splineCanvas = document.getElementById('spline-canvas');
+        const splineLoader = document.getElementById('spline-loader');
+        const splineBg = document.getElementById('spline-bg');
+
+        // Skip on mobile / touch devices for performance
+        const isMobile = window.innerWidth < 768 || ('ontouchstart' in window && window.matchMedia('(pointer: coarse)').matches);
+
+        if (!isMobile && splineCanvas) {
+            const app = new Application(splineCanvas);
+
+            app.load('https://prod.spline.design/7PEbpAR15WkVYR3m/scene.splinecode')
+                .then(() => {
+                    console.log('✅ SPLINE_3D::SUBSYSTEM_ONLINE');
+
+                    // Fade in the 3D scene
+                    splineCanvas.classList.add('loaded');
+
+                    // Hide the loader
+                    if (splineLoader) splineLoader.classList.add('hidden');
+
+                    // Enable pointer events so the scene is interactive on desktop
+                    splineBg.style.pointerEvents = 'auto';
+                })
+                .catch((err) => {
+                    console.warn('⚠️ SPLINE_3D::LOAD_FAILED', err);
+                    if (splineLoader) splineLoader.textContent = '[ 3D SUBSYSTEM OFFLINE ]';
+                    setTimeout(() => {
+                        if (splineLoader) splineLoader.classList.add('hidden');
+                    }, 3000);
+                });
+        } else {
+            // Mobile: hide loader immediately
+            if (splineLoader) splineLoader.classList.add('hidden');
         }
     </script>
 </body>
